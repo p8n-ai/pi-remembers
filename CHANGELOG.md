@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-04-19
+
 ### Added
 - Initial release of `@p8n.ai/pi-remembers`
 - **Direct Cloudflare AI Search REST API**
@@ -39,3 +41,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - API token resolved from environment variable, never stored in plaintext
 
 [Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/p8n-ai/pi-remembers/releases/tag/v0.1.0
