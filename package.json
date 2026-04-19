@@ -1,0 +1,60 @@
+{
+  "name": "@p8n.ai/pi-remembers",
+  "version": "0.0.0",
+  "description": "Pi extension for persistent agent memory and project search powered by Cloudflare AI Search. The North Remembers.",
+  "author": "Ravindra Barthwal",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p8n-ai/pi-remembers.git"
+  },
+  "homepage": "https://github.com/p8n-ai/pi-remembers#readme",
+  "bugs": {
+    "url": "https://github.com/p8n-ai/pi-remembers/issues"
+  },
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "cloudflare",
+    "ai-search",
+    "memory",
+    "agents",
+    "rag",
+    "vector-search",
+    "the-north-remembers"
+  ],
+  "files": [
+    "src/",
+    "skills/",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "*"
+  },
+  "devDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@mariozechner/pi-ai": "*",
+    "@mariozechner/pi-tui": "*",
+    "@sinclair/typebox": "^0.34.0",
+    "typescript": "^5.8.0"
+  }
+}
