@@ -11,6 +11,8 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Skip if the commit was made by the Release workflow (github-actions[bot])
+    if: ${{ !contains(github.event.head_commit.message, 'release: v') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,7 +63,6 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.current }}"
-          # Extract the section for this version from CHANGELOG.md
           BODY=$(awk -v ver="$VERSION" '
             /^## \[/ {
               if (found) exit
@@ -70,10 +71,7 @@ jobs:
             }
             found { print }
           ' CHANGELOG.md)
-
-          # Write to file for the release step (handles multiline)
           echo "$BODY" > /tmp/release-notes.md
-          echo "has_notes=true" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
         if: steps.version.outputs.changed == 'true'
