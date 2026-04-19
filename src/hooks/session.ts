@@ -21,5 +21,6 @@ export function updateMemoryStatus(ctx: ExtensionContext, config: ResolvedConfig
 		ctx.ui.setStatus("memory", undefined);
 		return;
 	}
-	ctx.ui.setStatus("memory", ctx.ui.theme.fg("accent", `🧠 ${config.projectMemoryInstance}`));
+	const label = config.projectName || config.projectMemoryInstance;
+	ctx.ui.setStatus("memory", ctx.ui.theme.fg("accent", `🧠 ${label}`));
 }

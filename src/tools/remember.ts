@@ -1,16 +1,24 @@
 /**
  * memory_remember tool — Store an important fact, decision, or preference.
+ *
+ * Writes are GATED: only ever to the current project's instance or to global.
+ * Cross-project writes are intentionally impossible — no `projects` parameter.
+ *
+ * On every successful project write, the current project is scheduled for a
+ * manifest refresh (debounced via `Debouncer`). Flag-gated.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { CloudflareApiClient } from "../cloudflare/api-client.js";
 import type { ResolvedConfig } from "../config.js";
+import type { Debouncer } from "../manifest.js";
 
 export function registerRememberTool(
 	pi: ExtensionAPI,
 	getClient: () => CloudflareApiClient | null,
 	getConfig: () => ResolvedConfig | null,
+	debouncer?: Debouncer,
 ) {
 	pi.registerTool({
 		name: "memory_remember",
@@ -43,6 +51,11 @@ export function registerRememberTool(
 			const instance = scope === "global" ? config.globalMemoryInstance : config.projectMemoryInstance;
 
 			const res = await client.remember(instance, params.content, { scope }, signal);
+
+			// T1 write-through: schedule debounced manifest refresh for project writes.
+			if (scope === "project" && config.projectId && debouncer) {
+				debouncer.schedule(config.projectId);
+			}
 
 			return {
 				content: [{ type: "text", text: `✓ Remembered (${scope}): ${params.content}` }],
