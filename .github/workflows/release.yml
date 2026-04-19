@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version
+        id: bump
+        run: |
+          OLD_VERSION=$(node -e "console.log(require('./package.json').version)")
+          NEW_VERSION=$(npm version ${{ inputs.bump }} --no-git-tag-version)
+          NEW_VERSION="${NEW_VERSION#v}"
+          echo "old=$OLD_VERSION" >> "$GITHUB_OUTPUT"
+          echo "new=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Bumping $OLD_VERSION → $NEW_VERSION"
+
+      - name: Update CHANGELOG
+        run: |
+          VERSION="${{ steps.bump.outputs.new }}"
+          DATE=$(date +%Y-%m-%d)
+          PREV="${{ steps.bump.outputs.old }}"
+
+          # Insert new version header after [Unreleased]
+          sed -i "s/^## \[Unreleased\]/## [Unreleased]\n\n## [$VERSION] - $DATE/" CHANGELOG.md
+
+          # Update links at bottom
+          if git tag | grep -q "v$PREV"; then
+            sed -i "s|^\[Unreleased\]:.*|[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v$VERSION...HEAD\n[$VERSION]: https://github.com/p8n-ai/pi-remembers/compare/v$PREV...v$VERSION|" CHANGELOG.md
+          else
+            sed -i "s|^\[Unreleased\]:.*|[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v$VERSION...HEAD\n[$VERSION]: https://github.com/p8n-ai/pi-remembers/releases/tag/v$VERSION|" CHANGELOG.md
+          fi
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ steps.bump.outputs.new }}"
+          git add package.json package-lock.json CHANGELOG.md
+          git commit -m "release: v$VERSION"
+          git push origin main
