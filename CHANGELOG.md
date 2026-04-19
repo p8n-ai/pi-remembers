@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-04-19
+
 ## [0.1.0] - 2026-04-19
 
 ### Added
@@ -40,5 +42,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.pi/pi-remembers.json` for project overrides (instance names, hook toggles)
   - API token resolved from environment variable, never stored in plaintext
 
-[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/p8n-ai/pi-remembers/releases/tag/v0.1.0
