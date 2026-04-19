@@ -65,10 +65,27 @@ export default function piRemembersExtension(pi: ExtensionAPI) {
 	registerCompactionHook(pi, getClient, getConfig);
 	registerAgentStartHook(pi, getClient, getConfig);
 
+	/**
+	 * Ensure project-specific AI Search instances exist.
+	 * Runs in the background — doesn't block session start.
+	 */
+	async function ensureProjectInstances() {
+		if (!client || !config) return;
+		try {
+			await Promise.all([
+				client.ensureInstance(config.projectMemoryInstance),
+				client.ensureInstance(config.searchInstance),
+			]);
+		} catch {
+			// Best-effort — instances may already exist or API may be unreachable
+		}
+	}
+
 	// Session lifecycle
 	pi.on("session_start", async (_event, ctx) => {
 		initClients(ctx.cwd);
 		updateMemoryStatus(ctx, config);
+		ensureProjectInstances();
 	});
 
 	pi.on("session_tree", async (_event, ctx) => {
