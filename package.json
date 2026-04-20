@@ -1,6 +1,6 @@
 {
   "name": "@p8n.ai/pi-remembers",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Pi extension for persistent agent memory and project search powered by Cloudflare AI Search. The North Remembers.",
   "author": "Ravindra Barthwal",
   "license": "MIT",
