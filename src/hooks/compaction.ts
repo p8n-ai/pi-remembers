@@ -1,10 +1,12 @@
 /**
  * Compaction hook — Ingest conversation into memory on compaction.
+ * Also opportunistically refreshes the manifest (T4 trigger).
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { CloudflareApiClient } from "../cloudflare/api-client.js";
 import type { ResolvedConfig } from "../config.js";
+import { refreshManifest } from "../manifest.js";
 
 export function registerCompactionHook(
 	pi: ExtensionAPI,
@@ -47,6 +49,17 @@ export function registerCompactionHook(
 			await client.remember(config.projectMemoryInstance, summary, { type: "compaction" });
 			ctx.ui.setStatus("memory-ingest", ctx.ui.theme.fg("success", `🧠 Ingested ${parts.length} msgs`));
 			setTimeout(() => ctx.ui.setStatus("memory-ingest", undefined), 5000);
+
+			// T4: opportunistic manifest refresh.
+			if (
+				config.features.manifest.enabled &&
+				config.features.manifest.autoUpdateOnCompaction &&
+				config.projectId
+			) {
+				refreshManifest(client, config).catch(() => {
+					// best-effort; don't disturb the user
+				});
+			}
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : "Unknown error";
 			ctx.ui.notify(`Memory ingest failed: ${msg}`, "warning");
