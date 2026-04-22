@@ -6,7 +6,7 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { CloudflareApiClient } from "../cloudflare/api-client.js";
 import type { ResolvedConfig } from "../config.js";
-
+import { synthesize } from "../subagent/synthesizer.js";
 export function registerSearchTool(
 	pi: ExtensionAPI,
 	getClient: () => CloudflareApiClient | null,
@@ -39,7 +39,39 @@ export function registerSearchTool(
 					details: { query: params.query, count: 0 } as Record<string, unknown>,
 				};
 			}
+			// Build raw text from chunks
+			const rawText = result.chunks
+				.map((c) => `--- ${c.item.key} (score: ${c.score.toFixed(2)}) ---\n${c.text}`)
+				.join("\n\n");
 
+			// Synthesize if enabled
+			const subagentCfg = config.features.subagent;
+			if (subagentCfg.enabled) {
+				const synthesis = await synthesize({
+					query: params.query,
+					rawText,
+					model: subagentCfg.model,
+					thinking: subagentCfg.thinking,
+					timeoutMs: subagentCfg.timeoutMs,
+					maxOutputChars: subagentCfg.maxOutputChars,
+					signal,
+				});
+
+				if (synthesis.success) {
+					return {
+						content: [{ type: "text", text: synthesis.text }],
+						details: {
+							query: params.query,
+							count: result.count,
+							synthesized: true,
+							synthesisDurationMs: synthesis.durationMs,
+						} as Record<string, unknown>,
+					};
+				}
+				// Synthesis failed — fall through to raw output
+			}
+
+			// Raw output (fallback or synthesis disabled)
 			const lines: string[] = [`Found ${result.count} result(s):\n`];
 			for (const chunk of result.chunks) {
 				lines.push(`--- ${chunk.item.key} (score: ${chunk.score.toFixed(2)}) ---`);
