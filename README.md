@@ -26,6 +26,8 @@
 |-|---------|-------------|
 | 🧠 | **Cross-Session Memory** | Decisions, preferences, and patterns persist across sessions. Come back tomorrow — the agent already knows your project. |
 | 🔍 | **Project File Search** | Hybrid vector + keyword search over indexed project files. Find anything without reading every file. |
+| 🌐 | **Cross-Project Recall** | Search memories across any known project. Stable project identity with git-style marker resolution. |
+| 🧹 | **Context Synthesis** | Memory results are automatically synthesized to return only query-relevant information, keeping context windows clean. |
 | ⚡ | **Auto Compaction Ingest** | When Pi compacts context, conversations are ingested into memory. Knowledge is never lost. |
 | 🎯 | **Smart Context Recall** | Relevant memories are recalled and injected before each turn. No repeating yourself. |
 | 🔒 | **Your Data, Your Account** | Everything stays in your Cloudflare account. No third-party data sharing. |
@@ -33,38 +35,45 @@
 ## How It Works
 
 ```
-┌──────────────────────────────────────────┐
-│  Pi Agent                                │
-│  ┌─────────────────────────────────────┐ │
-│  │  @p8n.ai/pi-remembers              │ │
-│  │                                     │ │
-│  │  Tools:    memory_recall            │ │
-│  │            memory_remember          │ │
-│  │            memory_search            │ │
-│  │            memory_list              │ │
-│  │                                     │ │
-│  │  Hooks:    compaction → ingest      │ │
-│  │            agent_start → recall     │ │
-│  │                                     │ │
-│  │  Commands: /memory-setup            │ │
-│  │            /memory-settings         │ │
-│  │            /memory-status           │ │
-│  │            /memory-index            │ │
-│  └──────────────┬──────────────────────┘ │
-└──────────────────┼───────────────────────┘
-                   │ REST API (API Token auth)
-                   ▼
-┌──────────────────────────────────────────┐
-│  Cloudflare AI Search                    │
-│                                          │
-│  Namespace: pi-remembers (or default)    │
-│    ├── pi-remembers-global    (memories) │
-│    ├── pi-remembers-proj-*    (memories) │
-│    └── pi-remembers-search-*  (files)    │
-└──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────┐
+│  Pi Agent                                        │
+│  ┌─────────────────────────────────────────────┐ │
+│  │  @p8n.ai/pi-remembers                       │ │
+│  │                                             │ │
+│  │  Tools:    memory_recall                    │ │
+│  │            memory_remember                  │ │
+│  │            memory_search                    │ │
+│  │            memory_list                      │ │
+│  │            memory_list_projects              │ │
+│  │                                             │ │
+│  │  Hooks:    compaction → ingest              │ │
+│  │            agent_start → recall             │ │
+│  │                                             │ │
+│  │  Commands: /memory-setup                    │ │
+│  │            /memory-settings                 │ │
+│  │            /memory-status                   │ │
+│  │            /memory-index                    │ │
+│  │            /memory-project                  │ │
+│  └────────────────┬──────────────┬─────────────┘ │
+└───────────────────┼──────────────┼──────────────┘
+                   │              │
+                   │ REST API     │ pi --print
+                   │              │ (synthesis)
+                   ▼              ▼
+┌─────────────────┐  ┌──────────────────────────┐
+│ Cloudflare      │  │ Synthesis Sub-process     │
+│ AI Search       │  │                           │
+│                 │  │ pi --print --no-tools     │
+│ ├─ global  mem  │  │    --no-session           │
+│ ├─ project mem  │  │    --no-skills            │
+│ ├─ manifest idx │  │    --no-extensions        │
+│ └─ file search  │  │                           │
+│                 │  │ Raw chunks → concise      │
+│                 │  │ query-relevant output    │
+└─────────────────┘  └──────────────────────────┘
 ```
 
-The extension calls the Cloudflare AI Search REST API directly. You just need a Cloudflare Account ID and an API Token.
+The extension calls the Cloudflare AI Search REST API directly. When `memory_recall` or `memory_search` returns results, they are automatically synthesized via a lightweight `pi --print` sub-process to extract only query-relevant information before returning to the agent.
 
 ## Prerequisites
 
@@ -148,19 +157,22 @@ The agent uses these tools proactively based on context:
 
 | Tool | What it does | Example trigger |
 |------|-------------|-----------------|
-| `memory_recall` | Search memories for past context | "What auth approach did we pick?" |
+| `memory_recall` | Search memories for past context (with automatic synthesis) | "What auth approach did we pick?" |
 | `memory_remember` | Store a fact or decision | "Let's use tRPC for the API layer" |
-| `memory_search` | Search indexed project files | "Find where the database schema is defined" |
+| `memory_search` | Search indexed project files (with automatic synthesis) | "Find where the database schema is defined" |
 | `memory_list` | List stored memories | "Show me what you remember" |
+| `memory_list_projects` | List known projects for cross-project recall | "What other projects do you know about?" |
 
 ### Slash Commands
 
 | Command | Description |
 |---------|-------------|
 | `/memory-setup` | Configure Cloudflare Account ID, API Token, namespace |
-| `/memory-settings` | Toggle hooks on/off interactively (auto-recall, auto-ingest, footer) |
+| `/memory-settings` | Toggle all hooks and feature flags interactively |
 | `/memory-status` | Show connection status, hook states, memory counts, indexed file stats |
 | `/memory-index [paths]` | Index project files into AI Search |
+| `/memory-project` | Show / manage project identity, aliases, and related projects |
+| `/memory-manifest-refresh` | Manually rebuild and publish the project manifest |
 
 ## Memory Scoping
 
@@ -170,6 +182,18 @@ The agent uses these tools proactively based on context:
 | **Project** | `pi-remembers-proj-{name}` | Project-specific context: architecture decisions, tech stack, conventions |
 
 Both scopes are queried on `memory_recall` and during auto-recall. The `memory_remember` tool defaults to project scope.
+
+`memory_recall` supports additional scopes for cross-project search:
+
+| Scope | Searches |
+|-------|----------|
+| `project` | Current project only |
+| `global` | Global memory only |
+| `both` | Project + global (default) |
+| `related` | Project + global + explicitly linked projects |
+| `all` | Every known project in the registry (read-only) |
+
+You can also pass explicit project refs: `memory_recall({ query: "...", projects: ["other-project"] })`. Use `memory_list_projects` to discover available projects. See [Cross-Project Memory](docs/cross-project-memory.md) for details.
 
 ## Configuration
 
@@ -215,6 +239,29 @@ Project-level `hooks` override global `defaults`. Absent keys fall back to globa
 | `autoIngest` | `false` | Auto-ingest conversations into memory on compaction |
 | `showStatus` | `true` | Show 🧠 memory status in footer bar |
 
+### Context synthesis
+
+When `memory_recall` or `memory_search` return results, they are automatically piped through a lightweight `pi --print` sub-process that filters the raw chunks down to only query-relevant information. This keeps the main agent's context window clean.
+
+Configure in `~/.pi/pi-remembers.json`:
+
+```jsonc
+{
+  "features": {
+    "subagent": {
+      "enabled": true,                              // toggle synthesis on/off
+      "model": "github-copilot/claude-haiku-4.5",    // fast model (default: pi default)
+      "thinking": "off",                              // no reasoning needed
+      "timeoutMs": 30000,                             // kill after 30s
+      "maxOutputChars": 4000                           // truncate output
+    }
+  }
+}
+```
+
+Set `"enabled": false` to return raw search results (original behavior).
+
+For more feature flags (cross-project recall, manifest discovery), see [Cross-Project Memory](docs/cross-project-memory.md).
 ## Skills
 
 Two bundled skills teach the agent when and how to use memory:

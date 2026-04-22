@@ -10,10 +10,10 @@
  * project identity stable regardless of which subfolder a session is opened in.
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
-import { join, basename, dirname, resolve } from "node:path";
-import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 
 // ── Config types ──
 
@@ -72,6 +72,18 @@ export interface FeatureFlags {
 		ttlDays?: number;
 		/** Max memories sampled when building a manifest record. Default: 20 */
 		sampleSize?: number;
+	};
+	subagent?: {
+		/** Enable synthesis for recall/search results via a pi sub-process. Default: true */
+		enabled?: boolean;
+		/** Model for synthesis (e.g. "anthropic/claude-haiku"). Default: undefined (pi default). */
+		model?: string;
+		/** Thinking level for the synthesis model. Default: "off" */
+		thinking?: string;
+		/** Kill the synthesis sub-process after this many ms. Default: 30000 */
+		timeoutMs?: number;
+		/** Truncate synthesis output to this many chars. Default: 4000 */
+		maxOutputChars?: number;
 	};
 }
 
@@ -160,6 +172,13 @@ export interface ResolvedFeatures {
 		debounceMs: number;
 		ttlDays: number;
 		sampleSize: number;
+	};
+	subagent: {
+		enabled: boolean;
+		model: string | undefined;
+		thinking: string;
+		timeoutMs: number;
+		maxOutputChars: number;
 	};
 }
 
@@ -360,6 +379,13 @@ export const FEATURE_DEFAULTS: ResolvedFeatures = {
 		ttlDays: 7,
 		sampleSize: 20,
 	},
+	subagent: {
+		enabled: true,
+		model: undefined,
+		thinking: "off",
+		timeoutMs: 30_000,
+		maxOutputChars: 4000,
+	},
 };
 
 function resolveSecret(value: string): string {
@@ -407,6 +433,13 @@ function resolveFeatures(global: GlobalConfig): ResolvedFeatures {
 			debounceMs,
 			ttlDays: f.manifest?.ttlDays ?? FEATURE_DEFAULTS.manifest.ttlDays,
 			sampleSize: f.manifest?.sampleSize ?? FEATURE_DEFAULTS.manifest.sampleSize,
+		},
+		subagent: {
+			enabled: f.subagent?.enabled ?? FEATURE_DEFAULTS.subagent.enabled,
+			model: f.subagent?.model ?? FEATURE_DEFAULTS.subagent.model,
+			thinking: f.subagent?.thinking ?? FEATURE_DEFAULTS.subagent.thinking,
+			timeoutMs: f.subagent?.timeoutMs ?? FEATURE_DEFAULTS.subagent.timeoutMs,
+			maxOutputChars: f.subagent?.maxOutputChars ?? FEATURE_DEFAULTS.subagent.maxOutputChars,
 		},
 	};
 }

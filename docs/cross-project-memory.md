@@ -155,6 +155,13 @@ an interactive UI.
       "debounceMs": 60000,
       "ttlDays": 7,
       "sampleSize": 20
+    },
+    "subagent": {
+      "enabled": true,        // synthesize recall/search results
+      "model": undefined,     // use pi's default model
+      "thinking": "off",
+      "timeoutMs": 30000,
+      "maxOutputChars": 4000
     }
   }
 }

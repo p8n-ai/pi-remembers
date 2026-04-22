@@ -20,9 +20,9 @@ import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import type { CloudflareApiClient } from "../cloudflare/api-client.js";
 import type { ResolvedConfig } from "../config.js";
-import { loadRegistry, resolveRef, type RegistryEntry } from "../registry.js";
 import { discoverProjects } from "../manifest.js";
-
+import { loadRegistry, resolveRef, type RegistryEntry } from "../registry.js";
+import { synthesize } from "../subagent/synthesizer.js";
 interface ResolvedProjectRef {
 	entry: RegistryEntry;
 	instance: string;
@@ -189,6 +189,47 @@ export function registerRecallTool(
 				};
 			}
 
+			// Build raw text from chunks — drop chunks without an instance_id
+			const rawText = result.chunks
+				.filter((c) => !!c.instance_id)
+				.map((c) => `[${c.instance_id}] (score: ${c.score.toFixed(2)}) ${c.text}`)
+				.join("\n---\n");
+
+			// Synthesize if enabled
+			const subagentCfg = config.features.subagent;
+			if (subagentCfg.enabled) {
+				const synthesis = await synthesize({
+					query: params.query,
+					rawText,
+					model: subagentCfg.model,
+					thinking: subagentCfg.thinking,
+					timeoutMs: subagentCfg.timeoutMs,
+					maxOutputChars: subagentCfg.maxOutputChars,
+					signal,
+				});
+
+				if (synthesis.success) {
+					const synthLines: string[] = [synthesis.text];
+					for (const w of warnings) synthLines.push(`⚠ ${w}`);
+					return {
+						content: [{ type: "text", text: synthLines.join("\n") }],
+						details: {
+							query: params.query,
+							scope,
+							scopeTags,
+							instances: instanceList,
+							discovered,
+							warnings,
+							count: result.count,
+							synthesized: true,
+							synthesisDurationMs: synthesis.durationMs,
+						} as Record<string, unknown>,
+					};
+				}
+				// Synthesis failed — fall through to raw output
+			}
+
+			// Raw output (fallback or synthesis disabled)
 			const lines: string[] = [`Found ${result.count} relevant memory chunk(s):\n`];
 			for (const chunk of result.chunks) {
 				const src = chunk.instance_id ?? "memory";

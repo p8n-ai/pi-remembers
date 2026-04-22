@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Context synthesis** — `memory_recall` and `memory_search` results are automatically synthesized via a lightweight `pi --print` sub-process before returning to the main agent. Raw Cloudflare AI Search chunks are filtered down to only query-relevant information, reducing context window consumption by ~80%. Enabled by default; configure via `features.subagent` in `~/.pi/pi-remembers.json`.
+- New files: `src/subagent/pi-spawn.ts` (pi binary resolution), `src/subagent/synthesizer.ts` (spawn + collect logic).
+
+### Changed
+- `memory_recall` and `memory_search` now return synthesized output when `features.subagent.enabled` is `true` (default). Set to `false` to restore raw output.
+- README updated with cross-project recall documentation, `memory_list_projects` tool, new slash commands, and context synthesis configuration.
+
 ## [0.2.0] - 2026-04-20
+
+### Added
+- **Cross-project memory** — search memories across any known project with stable project identity.
+- Stable project identity via `.pi/pi-remembers.json` marker with opaque id, slug, and aliases.
+- Git-style walk-up marker resolution (fixes subfolder confusion).
+- `memory_recall`: new `related` and `all` scopes, plus `projects` parameter for explicit cross-project reads.
+- `memory_list_projects` tool for LLM-side project discovery.
+- Manifest-based automatic discovery (Phase 3, opt-in via `features.manifest.enabled`).
+- New commands: `/memory-project`, `/memory-manifest-refresh`.
+- 57 tests covering config, registry, manifest, tools, and regression.
 
 ## [0.1.2] - 2026-04-19
 
