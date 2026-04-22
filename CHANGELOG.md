@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-22
+
 ### Added
 - **Context synthesis** — `memory_recall` and `memory_search` results are automatically synthesized via a lightweight `pi --print` sub-process before returning to the main agent. Raw Cloudflare AI Search chunks are filtered down to only query-relevant information, reducing context window consumption by ~80%. Enabled by default; configure via `features.subagent` in `~/.pi/pi-remembers.json`.
 - New files: `src/subagent/pi-spawn.ts` (pi binary resolution), `src/subagent/synthesizer.ts` (spawn + collect logic).
@@ -64,7 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.pi/pi-remembers.json` for project overrides (instance names, hook toggles)
   - API token resolved from environment variable, never stored in plaintext
 
-[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/p8n-ai/pi-remembers/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/p8n-ai/pi-remembers/releases/tag/v0.1.2
 [0.1.1]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.0...v0.1.1
