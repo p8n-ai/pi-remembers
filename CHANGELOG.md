@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Pipeline Observatory** — Local dashboard (`/memory-stats`) showing every operation’s pipeline steps, timing, chunk scores, and synthesis details. Backed by SQLite (`~/.pi/pi-remembers-stats.db`) with 7-day TTL. Opens in browser on `127.0.0.1`.
+- **PipelineRecorder abstraction** — Clean logging wrapper (`src/stats/recorder.ts`) that auto-numbers steps and provides `success()/error()/skip()` completions. Returns a silent NOOP recorder when stats are disabled — no conditionals needed in business logic.
+- **Chunk score filtering** — `features.recall.minChunkScore` (default 0.6) and `features.search.minChunkScore` (default 0.5) independently filter low-scoring chunks before synthesis or display.
+- New config: `features.stats.enabled` (default true), `features.search.minChunkScore`.
+- New commands: `/memory-stats`, `/memory-stats-stop`.
+- New files: `src/stats/logger.ts`, `src/stats/recorder.ts`, `src/stats/server.ts`, `src/stats/dashboard.html.ts`, `src/commands/stats.ts`.
+- Tests: `test/stats/logger.test.ts` (13 tests), `test/stats/recorder.test.ts` (7 tests), `test/stats/integration.test.ts` (3 tests).
+- ADR-001: Pipeline observability design rationale (`docs/decisions/ADR-001-pipeline-observability.md`).
+
+### Changed
+- All tools and hooks refactored to use PipelineRecorder instead of inline logger calls.
+- `SynthesizeResult` now includes observability fields (system prompt, task prompt, raw stdout/stderr, exit code) for pipeline tracing.
+- `prune()` uses `changes` from DELETE statement instead of two COUNT queries.
+
+
 ## [0.3.0] - 2026-04-22
 
 ### Added
