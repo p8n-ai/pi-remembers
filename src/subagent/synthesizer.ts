@@ -41,11 +41,30 @@ export interface SynthesizeResult {
 	success: boolean;
 	/** Wall-clock duration in ms. */
 	durationMs: number;
+	// ── Observability fields ──
+	/** The system prompt sent to pi --print. */
+	systemPrompt: string;
+	/** The full task prompt (query + raw data). */
+	taskPrompt: string;
+	/** Full pi --print argument list. */
+	piArgs: string[];
+	/** Raw subprocess stdout. */
+	rawStdout: string;
+	/** Raw subprocess stderr. */
+	rawStderr: string;
+	/** Process exit code (null if killed). */
+	exitCode: number | null;
+	/** Whether the process was killed by timeout. */
+	timedOut: boolean;
+	/** Model used for synthesis (undefined = pi default). */
+	model?: string;
+	/** Thinking level used. */
+	thinking?: string;
 }
 
 // ── System prompt ──
 
-const SYNTHESIS_SYSTEM_PROMPT = `You are a memory retrieval filter. You receive a query and raw memory search results. Return ONLY the information directly relevant to the query.
+export const SYNTHESIS_SYSTEM_PROMPT = `You are a memory retrieval filter. You receive a query and raw memory search results. Return ONLY the information directly relevant to the query.
 
 Rules:
 - Extract and return only what answers the query
@@ -81,7 +100,12 @@ export async function synthesize(opts: SynthesizeOptions): Promise<SynthesizeRes
 
 	// Early abort check
 	if (signal?.aborted) {
-		return { text: "", success: false, durationMs: 0 };
+		return {
+			text: "", success: false, durationMs: 0,
+			systemPrompt: SYNTHESIS_SYSTEM_PROMPT, taskPrompt: "", piArgs: [],
+			rawStdout: "", rawStderr: "", exitCode: null, timedOut: false,
+			model, thinking,
+		};
 	}
 
 	// Write temp files
@@ -138,12 +162,30 @@ export async function synthesize(opts: SynthesizeOptions): Promise<SynthesizeRes
 			text,
 			success: result.success,
 			durationMs: Date.now() - start,
+			systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
+			taskPrompt,
+			piArgs,
+			rawStdout: result.rawStdout,
+			rawStderr: result.rawStderr,
+			exitCode: result.exitCode,
+			timedOut: result.timedOut,
+			model,
+			thinking,
 		};
 	} catch (err) {
 		return {
 			text: err instanceof Error ? err.message : String(err),
 			success: false,
 			durationMs: Date.now() - start,
+			systemPrompt: SYNTHESIS_SYSTEM_PROMPT,
+			taskPrompt: "",
+			piArgs: [],
+			rawStdout: "",
+			rawStderr: "",
+			exitCode: null,
+			timedOut: false,
+			model,
+			thinking,
 		};
 	} finally {
 		// Cleanup temp files
@@ -162,6 +204,10 @@ export async function synthesize(opts: SynthesizeOptions): Promise<SynthesizeRes
 interface SpawnResult {
 	output: string;
 	success: boolean;
+	rawStdout: string;
+	rawStderr: string;
+	exitCode: number | null;
+	timedOut: boolean;
 }
 
 function spawnPi(
@@ -231,7 +277,7 @@ function spawnPi(
 			const text = extractFinalText(stdout);
 
 			if (timedOut) {
-				resolve({ output: text || "(synthesis timed out)", success: false });
+				resolve({ output: text || "(synthesis timed out)", success: false, rawStdout: stdout, rawStderr: stderr, exitCode: exitCode ?? null, timedOut: true });
 				return;
 			}
 
@@ -239,11 +285,12 @@ function spawnPi(
 				resolve({
 					output: stderr.trim() || `(pi exited with code ${exitCode})`,
 					success: false,
+					rawStdout: stdout, rawStderr: stderr, exitCode: exitCode ?? null, timedOut: false,
 				});
 				return;
 			}
 
-			resolve({ output: text, success: !!text });
+			resolve({ output: text, success: !!text, rawStdout: stdout, rawStderr: stderr, exitCode: exitCode ?? null, timedOut: false });
 		});
 
 		child.on("error", (err) => {
@@ -251,7 +298,7 @@ function spawnPi(
 			settled = true;
 			clearTimeout(timer);
 			signal?.removeEventListener("abort", onAbort);
-			resolve({ output: err.message, success: false });
+			resolve({ output: err.message, success: false, rawStdout: stdout, rawStderr: stderr, exitCode: null, timedOut: false });
 		});
 	});
 }

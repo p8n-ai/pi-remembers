@@ -11,10 +11,10 @@
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { CloudflareApiClient } from "./cloudflare/api-client.js";
-import { resolveConfig, type ResolvedConfig } from "./config.js";
+import { resolveConfig, statsDbPath, type ResolvedConfig } from "./config.js";
 import { touchProject } from "./registry.js";
 import { createDebouncer, type Debouncer } from "./manifest.js";
-
+import { StatsLogger } from "./stats/logger.js";
 // Tools
 import { registerRecallTool } from "./tools/recall.js";
 import { registerRememberTool } from "./tools/remember.js";
@@ -34,10 +34,12 @@ import { registerIndexCommand } from "./commands/index-project.js";
 import { registerSettingsCommand } from "./commands/settings.js";
 import { registerProjectCommand } from "./commands/project.js";
 import { registerManifestRefreshCommand } from "./commands/manifest-refresh.js";
+import { registerStatsCommand } from "./commands/stats.js";
 
 export default function piRemembersExtension(pi: ExtensionAPI) {
 	let config: ResolvedConfig | null = null;
 	let client: CloudflareApiClient | null = null;
+	let logger: StatsLogger | null = null;
 	let lastCwd = ".";
 
 	const getConfig = (): ResolvedConfig | null => config;
@@ -74,6 +76,14 @@ export default function piRemembersExtension(pi: ExtensionAPI) {
 				// best-effort
 			}
 		}
+		// Initialize stats logger (once)
+		if (!logger && config.features.stats.enabled) {
+			try {
+				logger = new StatsLogger(statsDbPath());
+			} catch {
+				// best-effort — stats are optional
+			}
+		}
 	}
 
 	// Commands
@@ -90,16 +100,20 @@ export default function piRemembersExtension(pi: ExtensionAPI) {
 	});
 	registerManifestRefreshCommand(pi, getClient, getConfig);
 
+	// Logger getter — logger is initialized lazily in initClients()
+	const getLogger = (): StatsLogger | null => logger;
+	registerStatsCommand(pi, getClient, getConfig, getLogger);
+
 	// Tools
-	registerRecallTool(pi, getClient, getConfig);
-	registerRememberTool(pi, getClient, getConfig, debouncer);
-	registerSearchTool(pi, getClient, getConfig);
-	registerListTool(pi, getClient, getConfig);
-	registerListProjectsTool(pi, getConfig);
+	registerRecallTool(pi, getClient, getConfig, getLogger);
+	registerRememberTool(pi, getClient, getConfig, debouncer, getLogger);
+	registerSearchTool(pi, getClient, getConfig, getLogger);
+	registerListTool(pi, getClient, getConfig, getLogger);
+	registerListProjectsTool(pi, getConfig, getLogger);
 
 	// Hooks
-	registerCompactionHook(pi, getClient, getConfig);
-	registerAgentStartHook(pi, getClient, getConfig);
+	registerCompactionHook(pi, getClient, getConfig, getLogger);
+	registerAgentStartHook(pi, getClient, getConfig, getLogger);
 
 	/**
 	 * Ensure project-specific AI Search instances exist.
@@ -125,6 +139,10 @@ export default function piRemembersExtension(pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
 		initClients(ctx.cwd);
 		updateMemoryStatus(ctx, config);
+		// Prune old stats (7-day TTL)
+		if (logger) {
+			try { logger.prune(); } catch { /* best-effort */ }
+		}
 		ensureProjectInstances();
 	});
 
@@ -135,6 +153,11 @@ export default function piRemembersExtension(pi: ExtensionAPI) {
 
 	// T2: session-end flush — write-through any pending manifest updates.
 	pi.on("session_shutdown", async () => {
+		// Close stats logger
+		if (logger) {
+			try { logger.close(); } catch { /* best-effort */ }
+			logger = null;
+		}
 		if (!config || !client) return;
 		if (!config.features.manifest.enabled) return;
 		if (!config.features.manifest.autoUpdateOnSessionEnd) return;

@@ -31,6 +31,7 @@
 | ⚡ | **Auto Compaction Ingest** | When Pi compacts context, conversations are ingested into memory. Knowledge is never lost. |
 | 🎯 | **Smart Context Recall** | Relevant memories are recalled and injected before each turn. No repeating yourself. |
 | 🔒 | **Your Data, Your Account** | Everything stays in your Cloudflare account. No third-party data sharing. |
+| 📊 | **Pipeline Observatory** | Local dashboard showing every operation's pipeline steps, timing, chunk scores, and synthesis details. Debug recall issues in seconds. |
 
 ## How It Works
 
@@ -54,6 +55,7 @@
 │  │            /memory-status                   │ │
 │  │            /memory-index                    │ │
 │  │            /memory-project                  │ │
+│  │            /memory-stats                    │ │
 │  └────────────────┬──────────────┬─────────────┘ │
 └───────────────────┼──────────────┼──────────────┘
                    │              │
@@ -173,6 +175,8 @@ The agent uses these tools proactively based on context:
 | `/memory-index [paths]` | Index project files into AI Search |
 | `/memory-project` | Show / manage project identity, aliases, and related projects |
 | `/memory-manifest-refresh` | Manually rebuild and publish the project manifest |
+| `/memory-stats` | Open pipeline observability dashboard in the browser |
+| `/memory-stats-stop` | Stop the dashboard server |
 
 ## Memory Scoping
 
@@ -262,6 +266,40 @@ Configure in `~/.pi/pi-remembers.json`:
 Set `"enabled": false` to return raw search results (original behavior).
 
 For more feature flags (cross-project recall, manifest discovery), see [Cross-Project Memory](docs/cross-project-memory.md).
+
+### Pipeline observatory
+
+Every tool and hook operation is instrumented with step-level timing and metadata, stored in a local SQLite database (`~/.pi/pi-remembers-stats.db`). Run `/memory-stats` to open the dashboard:
+
+```
+/memory-stats          # opens http://127.0.0.1:<port> in your browser
+/memory-stats-stop     # shuts down the dashboard server
+```
+
+The dashboard has four tabs:
+
+| Tab | Shows |
+|-----|-------|
+| **Overview** | Total ops, success rate, errors, avg recall latency, activity chart |
+| **Operations** | Filterable list of all operations with expandable pipeline step details |
+| **Memory Store** | Live view of project and global memories from Cloudflare |
+| **Config** | Current resolved config (secrets redacted) |
+
+Click any operation row to see its full pipeline: instance resolution → discovery → Cloudflare search → chunk filtering → synthesis → output, with timing for each step.
+
+Configure in `~/.pi/pi-remembers.json`:
+
+```jsonc
+{
+  "features": {
+    "stats": {
+      "enabled": true   // set to false to disable stats logging entirely
+    }
+  }
+}
+```
+
+Stats are pruned after 7 days automatically. See [ADR-001](docs/decisions/ADR-001-pipeline-observability.md) for design rationale.
 ## Skills
 
 Two bundled skills teach the agent when and how to use memory:
