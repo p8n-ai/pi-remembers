@@ -52,6 +52,8 @@ export interface FeatureFlags {
 		discoveryTopK?: number;
 		/** Timeout (ms) for the discovery phase before falling back. Default: 1500 */
 		discoveryTimeoutMs?: number;
+		/** Minimum chunk score to keep from Cloudflare results. Lower-scored chunks are dropped before synthesis. Default: 0.6 */
+		minChunkScore?: number;
 	};
 	manifest?: {
 		/** Master switch for manifest indexing (Phase 3). Default: false */
@@ -84,6 +86,14 @@ export interface FeatureFlags {
 		timeoutMs?: number;
 		/** Truncate synthesis output to this many chars. Default: 4000 */
 		maxOutputChars?: number;
+	};
+	search?: {
+		/** Minimum chunk score to keep from search results. Default: 0.5 */
+		minChunkScore?: number;
+	};
+	stats?: {
+		/** Enable pipeline instrumentation logging to SQLite. Default: true */
+		enabled?: boolean;
 	};
 }
 
@@ -161,6 +171,7 @@ export interface ResolvedFeatures {
 		discoveryThreshold: number;
 		discoveryTopK: number;
 		discoveryTimeoutMs: number;
+		minChunkScore: number;
 	};
 	manifest: {
 		enabled: boolean;
@@ -180,6 +191,12 @@ export interface ResolvedFeatures {
 		timeoutMs: number;
 		maxOutputChars: number;
 	};
+	stats: {
+		enabled: boolean;
+	};
+	search: {
+		minChunkScore: number;
+	};
 }
 
 // ── Paths ──
@@ -189,6 +206,10 @@ const PROJECT_CONFIG_DIR = ".pi";
 
 function globalConfigDir(): string {
 	return join(homedir(), ".pi");
+}
+
+export function statsDbPath(): string {
+	return join(globalConfigDir(), "pi-remembers-stats.db");
 }
 
 export function globalConfigPath(): string {
@@ -367,6 +388,7 @@ export const FEATURE_DEFAULTS: ResolvedFeatures = {
 		discoveryThreshold: 0.55,
 		discoveryTopK: 3,
 		discoveryTimeoutMs: 1500,
+		minChunkScore: 0.6,
 	},
 	manifest: {
 		enabled: false,
@@ -385,6 +407,12 @@ export const FEATURE_DEFAULTS: ResolvedFeatures = {
 		thinking: "off",
 		timeoutMs: 30_000,
 		maxOutputChars: 4000,
+	},
+	stats: {
+		enabled: true,
+	},
+	search: {
+		minChunkScore: 0.5,
 	},
 };
 
@@ -421,6 +449,7 @@ function resolveFeatures(global: GlobalConfig): ResolvedFeatures {
 			discoveryThreshold: f.recall?.discoveryThreshold ?? FEATURE_DEFAULTS.recall.discoveryThreshold,
 			discoveryTopK: f.recall?.discoveryTopK ?? FEATURE_DEFAULTS.recall.discoveryTopK,
 			discoveryTimeoutMs: f.recall?.discoveryTimeoutMs ?? FEATURE_DEFAULTS.recall.discoveryTimeoutMs,
+			minChunkScore: f.recall?.minChunkScore ?? FEATURE_DEFAULTS.recall.minChunkScore,
 		},
 		manifest: {
 			enabled: f.manifest?.enabled ?? FEATURE_DEFAULTS.manifest.enabled,
@@ -440,6 +469,12 @@ function resolveFeatures(global: GlobalConfig): ResolvedFeatures {
 			thinking: f.subagent?.thinking ?? FEATURE_DEFAULTS.subagent.thinking,
 			timeoutMs: f.subagent?.timeoutMs ?? FEATURE_DEFAULTS.subagent.timeoutMs,
 			maxOutputChars: f.subagent?.maxOutputChars ?? FEATURE_DEFAULTS.subagent.maxOutputChars,
+		},
+		stats: {
+			enabled: f.stats?.enabled ?? FEATURE_DEFAULTS.stats.enabled,
+		},
+		search: {
+			minChunkScore: f.search?.minChunkScore ?? FEATURE_DEFAULTS.search.minChunkScore,
 		},
 	};
 }

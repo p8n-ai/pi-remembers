@@ -1,11 +1,5 @@
 /**
- * memory_remember tool — Store an important fact, decision, or preference.
- *
- * Writes are GATED: only ever to the current project's instance or to global.
- * Cross-project writes are intentionally impossible — no `projects` parameter.
- *
- * On every successful project write, the current project is scheduled for a
- * manifest refresh (debounced via `Debouncer`). Flag-gated.
+ * memory_remember tool — Store a persistent memory.
  */
 
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
@@ -13,12 +7,15 @@ import { Type } from "@sinclair/typebox";
 import type { CloudflareApiClient } from "../cloudflare/api-client.js";
 import type { ResolvedConfig } from "../config.js";
 import type { Debouncer } from "../manifest.js";
+import type { StatsLogger } from "../stats/logger.js";
+import { createRecorder } from "../stats/recorder.js";
 
 export function registerRememberTool(
 	pi: ExtensionAPI,
 	getClient: () => CloudflareApiClient | null,
 	getConfig: () => ResolvedConfig | null,
 	debouncer?: Debouncer,
+	getLogger: (() => StatsLogger | null) | null = null,
 ) {
 	pi.registerTool({
 		name: "memory_remember",
@@ -32,9 +29,7 @@ export function registerRememberTool(
 			"Store memories as clear, atomic statements.",
 		],
 		parameters: Type.Object({
-			content: Type.String({
-				description: "The memory to store — a clear, self-contained statement",
-			}),
+			content: Type.String({ description: "The memory to store — a clear, self-contained statement" }),
 			scope: Type.Optional(
 				Type.Union([Type.Literal("project"), Type.Literal("global")], {
 					description: "'project' (default) or 'global' (user-wide preference)",
@@ -43,24 +38,51 @@ export function registerRememberTool(
 		}),
 
 		async execute(_toolCallId, params, signal) {
-			const client = getClient();
 			const config = getConfig();
-			if (!client || !config) throw new Error("Not configured. Run /memory-setup first.");
+			const rec = createRecorder(getLogger?.() ?? null, "remember", {
+				query: params.content,
+				scope: params.scope ?? "project",
+				projectId: config?.projectId,
+				projectName: config?.projectName,
+			});
 
-			const scope = params.scope ?? "project";
-			const instance = scope === "global" ? config.globalMemoryInstance : config.projectMemoryInstance;
+			try {
+				const client = getClient();
+				if (!client || !config) throw new Error("Not configured. Run /memory-setup first.");
 
-			const res = await client.remember(instance, params.content, { scope }, signal);
+				const scope = params.scope ?? "project";
+				const instance = scope === "global" ? config.globalMemoryInstance : config.projectMemoryInstance;
 
-			// T1 write-through: schedule debounced manifest refresh for project writes.
-			if (scope === "project" && config.projectId && debouncer) {
-				debouncer.schedule(config.projectId);
+				rec.step("input_params", { input: { content: params.content, scope } });
+				rec.step("resolve_instance", { input: { scope }, output: { instance } });
+
+				const t1 = Date.now();
+				const res = await client.remember(instance, params.content, { scope }, signal);
+				rec.step("cloudflare_upload", {
+					input: { instance, contentLength: params.content.length },
+					output: { id: res.id, key: res.key, status: res.status },
+					durationMs: Date.now() - t1,
+				});
+
+				// T1 write-through: schedule debounced manifest refresh for project writes.
+				const scheduled = !!(scope === "project" && config.projectId && debouncer);
+				if (scheduled) {
+					debouncer!.schedule(config.projectId!);
+				}
+				rec.step("manifest_schedule", { output: { scheduled }, metadata: { projectId: config.projectId } });
+
+				const text = `✓ Remembered (${scope}): ${params.content}`;
+				rec.step("final_output", { output: { text } });
+				rec.success();
+
+				return {
+					content: [{ type: "text", text }],
+					details: { content: params.content, scope, id: res.id } as Record<string, unknown>,
+				};
+			} catch (err) {
+				rec.error(err instanceof Error ? err.message : String(err));
+				throw err;
 			}
-
-			return {
-				content: [{ type: "text", text: `✓ Remembered (${scope}): ${params.content}` }],
-				details: { content: params.content, scope, id: res.id } as Record<string, unknown>,
-			};
 		},
 	});
 }
