@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-03
+
 ### Added
 - **Pipeline Observatory** — Local dashboard (`/memory-stats`) showing every operation’s pipeline steps, timing, chunk scores, and synthesis details. Backed by SQLite (`~/.pi/pi-remembers-stats.db`) with 7-day TTL. Opens in browser on `127.0.0.1`.
 - **PipelineRecorder abstraction** — Clean logging wrapper (`src/stats/recorder.ts`) that auto-numbers steps and provides `success()/error()/skip()` completions. Returns a silent NOOP recorder when stats are disabled — no conditionals needed in business logic.
@@ -82,7 +84,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `.pi/pi-remembers.json` for project overrides (instance names, hook toggles)
   - API token resolved from environment variable, never stored in plaintext
 
-[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/p8n-ai/pi-remembers/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/p8n-ai/pi-remembers/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/p8n-ai/pi-remembers/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/p8n-ai/pi-remembers/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/p8n-ai/pi-remembers/releases/tag/v0.1.2
